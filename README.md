@@ -1,16 +1,23 @@
-# AI Chat Support Agent
+# 🛒 Cozy Cart Support Agent
 
 A conversational AI support agent embedded in a live chat widget.
-**Live Demo:** [Add your deployed URL here]
 
-## Tech Stack
+**🚀 [Live Demo](https://cozy-cart-chat-support.vercel.app/)** — Go ahead, ask it about shipping!
 
-- **Frontend:** React, TypeScript, Vite, Tailwind CSS
-- **Backend:** Node.js, Express, TypeScript
-- **Database:** PostgreSQL
-- **LLM:** Groq (Llama 3.3 70B)
+---
 
-## Architecture
+## ⚡ Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| **Frontend** | React, TypeScript, Vite, Tailwind CSS |
+| **Backend** | Node.js, Express, TypeScript |
+| **Database** | PostgreSQL |
+| **LLM** | Groq (Llama 3.3 70B) |
+
+---
+
+## 🏗️ Architecture
 
 The system follows a straightforward client-server model with clear separation of concerns. The React frontend handles UI state and user interactions, delegating all business logic to the backend. This keeps the client thin and the API surface predictable.
 
@@ -20,7 +27,9 @@ Session management uses a simple but effective approach—the server generates a
 
 The database schema is minimal: a `conversations` table and a `messages` table with a foreign key relationship. Messages store the sender type (`user` or `ai`) and content, enabling the server to reconstruct conversation history for LLM context. UUIDs are used as primary keys for portability and to avoid sequential ID enumeration.
 
-## LLM Integration
+---
+
+## 🤖 LLM Integration
 
 The LLM service wraps Groq's API, which provides fast inference on Llama 3.3 70B. Groq was chosen over OpenAI or Anthropic primarily for its generous free tier and low latency—their custom LPU hardware delivers responses noticeably faster than GPU-based alternatives.
 
@@ -28,22 +37,27 @@ The system prompt establishes the AI as a customer support agent for "Cozy Cart,
 
 Context management balances quality with cost: the last 20 messages are included in each request, and individual messages are truncated to 2000 characters. This keeps token usage reasonable while maintaining enough context for coherent multi-turn conversations.
 
-## API
+---
 
-**POST /chat/message**
+## 📡 API
+
+```
+POST /chat/message
+```
 ```json
-// Request
 { "message": "What's your return policy?", "sessionId": "optional-uuid" }
-
-// Response
+↓
 { "reply": "We offer a 30-day hassle-free return policy...", "sessionId": "uuid" }
 ```
 
-**GET /chat/history/:sessionId** — Returns all messages for a conversation.
+```
+GET /chat/history/:sessionId   →  Returns all messages for a conversation
+GET /health                    →  Health check endpoint
+```
 
-**GET /health** — Health check endpoint.
+---
 
-## Running Locally
+## 🛠️ Running Locally
 
 **Prerequisites:** Node.js 18+, PostgreSQL 14+
 
@@ -66,41 +80,53 @@ npm run db:setup
 npm run dev
 ```
 
-Frontend runs at `localhost:8080`, backend at `localhost:3001`.
+Frontend → `localhost:8080` | Backend → `localhost:3001`
 
-## Deployment
+---
 
-The app deploys cleanly to any Node.js hosting platform. Recommended setup:
+## 🌐 Deployment
 
-1. **Database:** Neon (free PostgreSQL)
-2. **Backend:** Render — build with `npm install`, start with `npx tsx server/index.ts`
-3. **Frontend:** Vercel — set `VITE_API_URL` to your backend URL
+| Component | Platform | Config |
+|-----------|----------|--------|
+| **Database** | Neon | Free PostgreSQL |
+| **Backend** | Render | `npm install` → `npx tsx server/index.ts` |
+| **Frontend** | Vercel | Set `VITE_API_URL` to backend URL |
 
-## Design Decisions
+---
 
-**PostgreSQL over SQLite:** While SQLite would simplify local development, PostgreSQL's UUID support and production-readiness made it the better choice. The schema can scale to millions of messages without modification.
+## 🧠 Design Decisions
 
-**Stateless sessions without auth:** For a support chat, full authentication adds friction without clear benefit. The UUID-based session approach provides conversation continuity while keeping the implementation simple. Adding auth later would be straightforward—the session ID could become a user ID foreign key.
+**PostgreSQL over SQLite** — While SQLite would simplify local development, PostgreSQL's UUID support and production-readiness made it the better choice. The schema can scale to millions of messages without modification.
 
-**Groq over OpenAI:** Cost and speed. Groq's free tier is generous enough for development and demos, and their inference speed creates a noticeably better user experience. The trade-off is a smaller model ecosystem, but Llama 3.3 70B handles support queries well.
+**Stateless sessions without auth** — For a support chat, full authentication adds friction without clear benefit. The UUID-based session approach provides conversation continuity while keeping the implementation simple. Adding auth later would be straightforward—the session ID could become a user ID foreign key.
 
-**No WebSockets:** HTTP polling would add complexity without meaningful UX improvement for a support chat. The typing indicator is client-side only. WebSockets would make sense if we needed real-time features like agent handoff or live typing visibility.
+**Groq over OpenAI** — Cost and speed. Groq's free tier is generous enough for development and demos, and their inference speed creates a noticeably better user experience. The trade-off is a smaller model ecosystem, but Llama 3.3 70B handles support queries well.
 
-## Project Structure
+**No WebSockets** — HTTP polling would add complexity without meaningful UX improvement for a support chat. The typing indicator is client-side only. WebSockets would make sense if we needed real-time features like agent handoff or live typing visibility.
+
+---
+
+## 📁 Project Structure
 
 ```
 server/
-├── index.ts           # Express setup, middleware
-├── routes/chat.ts     # API endpoints
+├── index.ts           → Express setup
+├── routes/chat.ts     → API endpoints
 ├── services/
-│   ├── chat.ts        # Database operations
-│   └── llm.ts         # Groq integration
+│   ├── chat.ts        → Database operations
+│   └── llm.ts         → Groq integration
 └── db/
-    ├── index.ts       # Connection pool
-    └── setup.ts       # Schema migrations
+    ├── index.ts       → Connection pool
+    └── setup.ts       → Schema migrations
 
 src/
-├── components/chat/   # Chat UI components
-├── pages/             # Page components
-└── index.css          # Global styles
+├── components/chat/   → Chat UI components
+├── pages/             → Page components
+└── index.css          → Global styles
 ```
+
+---
+
+<p align="center">
+  Built with ☕ and curiosity
+</p>
