@@ -15,7 +15,6 @@ export interface DBMessage {
   created_at: Date;
 }
 
-// Create a new conversation
 export async function createConversation(): Promise<string> {
   const result = await pool.query<{ id: string }>(
     "INSERT INTO conversations DEFAULT VALUES RETURNING id"
@@ -23,7 +22,6 @@ export async function createConversation(): Promise<string> {
   return result.rows[0].id;
 }
 
-// Get conversation by ID
 export async function getConversation(id: string): Promise<Conversation | null> {
   const result = await pool.query<Conversation>(
     "SELECT * FROM conversations WHERE id = $1",
@@ -32,7 +30,6 @@ export async function getConversation(id: string): Promise<Conversation | null> 
   return result.rows[0] || null;
 }
 
-// Save a message to the database
 export async function saveMessage(
   conversationId: string,
   sender: "user" | "ai",
@@ -45,7 +42,6 @@ export async function saveMessage(
     [conversationId, sender, content]
   );
 
-  // Update conversation timestamp
   await pool.query(
     "UPDATE conversations SET updated_at = NOW() WHERE id = $1",
     [conversationId]
@@ -54,7 +50,6 @@ export async function saveMessage(
   return result.rows[0];
 }
 
-// Get conversation history
 export async function getConversationHistory(
   conversationId: string
 ): Promise<Message[]> {
@@ -71,7 +66,6 @@ export async function getConversationHistory(
   }));
 }
 
-// Get messages with full details (for API response)
 export async function getMessages(conversationId: string): Promise<DBMessage[]> {
   const result = await pool.query<DBMessage>(
     `SELECT * FROM messages
