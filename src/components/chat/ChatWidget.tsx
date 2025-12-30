@@ -18,38 +18,24 @@ const WELCOME_MESSAGE: Message = {
   timestamp: new Date(),
 };
 
-const STORAGE_KEY = "chat_messages";
+const SESSION_KEY = "chat_session_id";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 export function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load messages from localStorage
+  // Load session and history from server
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const loadedMessages: Message[] = parsed.map((msg: Message) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
-        }));
-        setMessages([WELCOME_MESSAGE, ...loadedMessages]);
-      } catch {
-        console.error("Failed to parse stored messages");
-      }
+    const storedSessionId = localStorage.getItem(SESSION_KEY);
+    if (storedSessionId) {
+      setSessionId(storedSessionId);
+      loadConversationHistory(storedSessionId);
     }
   }, []);
-
-  // Save messages to localStorage (excluding welcome message)
-  useEffect(() => {
-    const toStore = messages.filter((m) => m.id !== "welcome");
-    if (toStore.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
-    }
-  }, [messages]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -57,6 +43,40 @@ export function ChatWidget() {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isLoading]);
+
+  const loadConversationHistory = async (sid: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/chat/history/${sid}`);
+
+      if (!response.ok) {
+        // Session not found, clear it
+        if (response.status === 404) {
+          localStorage.removeItem(SESSION_KEY);
+          setSessionId(null);
+        }
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.messages && data.messages.length > 0) {
+        const loadedMessages: Message[] = data.messages.map((msg: {
+          id: string;
+          sender: "user" | "ai";
+          content: string;
+          timestamp: string;
+        }) => ({
+          id: msg.id,
+          sender: msg.sender,
+          content: msg.content,
+          timestamp: new Date(msg.timestamp),
+        }));
+        setMessages([WELCOME_MESSAGE, ...loadedMessages]);
+      }
+    } catch (error) {
+      console.error("Failed to load conversation history:", error);
+    }
+  };
 
   const handleSend = useCallback(async (content: string) => {
     if (!content.trim()) {
@@ -79,24 +99,24 @@ export function ChatWidget() {
     setIsLoading(true);
 
     try {
-      // Get conversation history for context (last 20 messages)
-      const history = messages
-        .filter((m) => m.id !== "welcome")
-        .slice(-20)
-        .map((m) => ({ sender: m.sender, content: m.content }));
-
-      const response = await fetch("http://localhost:3001/api/chat", {
+      const response = await fetch(`${API_BASE}/chat/message`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           message: content.slice(0, 2000),
-          history,
+          sessionId: sessionId || undefined,
         }),
       });
 
       const data = await response.json();
+
+      // Save session ID
+      if (data.sessionId && data.sessionId !== sessionId) {
+        setSessionId(data.sessionId);
+        localStorage.setItem(SESSION_KEY, data.sessionId);
+      }
 
       if (!response.ok) {
         toast.error(data.error || "Something went wrong. Please try again.");
@@ -133,10 +153,11 @@ export function ChatWidget() {
     } finally {
       setIsLoading(false);
     }
-  }, [messages]);
+  }, [sessionId]);
 
   const handleNewChat = () => {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    setSessionId(null);
     setMessages([{ ...WELCOME_MESSAGE, timestamp: new Date() }]);
     toast.success("Started a new conversation");
   };
