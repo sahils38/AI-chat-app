@@ -1,288 +1,106 @@
 # AI Chat Support Agent
 
-A mini AI support agent for a live chat widget, built as part of the Spur Founding Full-Stack Engineer take-home assignment.
-
-## Live Demo
-
-**Deployed URL:** [Add your deployed URL here]
+A conversational AI support agent embedded in a live chat widget.
+**Live Demo:** [Add your deployed URL here]
 
 ## Tech Stack
 
-- **Frontend:** React + TypeScript + Vite
-- **Backend:** Node.js + Express + TypeScript
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS
+- **Backend:** Node.js, Express, TypeScript
 - **Database:** PostgreSQL
-- **AI/LLM:** Groq (Llama 3.3 70B)
-- **UI Components:** shadcn-ui + Tailwind CSS
+- **LLM:** Groq (Llama 3.3 70B)
 
-## Features
+## Architecture
 
-- Real-time AI chat powered by Google Gemini
-- Conversation persistence in PostgreSQL
-- Session management with automatic history loading
-- Input validation and error handling
-- Responsive chat UI with typing indicators
-- "Agent is typing..." indicator during AI response
+The system follows a straightforward client-server model with clear separation of concerns. The React frontend handles UI state and user interactions, delegating all business logic to the backend. This keeps the client thin and the API surface predictable.
 
-## Architecture Overview
+The backend is structured into three layers: routes handle HTTP concerns and request validation, services encapsulate business logic and external integrations, and the database layer manages persistence through a connection pool. This separation makes the codebase easy to navigate and test in isolation.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (React)                         │
-│  localhost:8080                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ ChatWidget.tsx                                           │    │
-│  │  - Manages UI state                                      │    │
-│  │  - Stores sessionId in localStorage                      │    │
-│  │  - Calls backend API                                     │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Backend (Express + TypeScript)                │
-│  localhost:3001                                                  │
-│                                                                  │
-│  server/                                                         │
-│  ├── index.ts          # Express server setup                   │
-│  ├── routes/                                                     │
-│  │   └── chat.ts       # API endpoints (/chat/message, etc.)    │
-│  ├── services/                                                   │
-│  │   ├── chat.ts       # Database operations                    │
-│  │   └── llm.ts        # Gemini API integration                 │
-│  └── db/                                                         │
-│      ├── index.ts      # PostgreSQL connection pool             │
-│      └── setup.ts      # Database schema setup                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-┌─────────────────────────┐     ┌─────────────────────────┐
-│      PostgreSQL         │     │     Google Gemini       │
-│  ┌──────────────────┐   │     │                         │
-│  │ conversations    │   │     │  gemini-1.5-flash       │
-│  │  - id (UUID)     │   │     │                         │
-│  │  - created_at    │   │     │  System prompt with     │
-│  │  - updated_at    │   │     │  store knowledge        │
-│  │  - metadata      │   │     │                         │
-│  └──────────────────┘   │     └─────────────────────────┘
-│  ┌──────────────────┐   │
-│  │ messages         │   │
-│  │  - id (UUID)     │   │
-│  │  - conversation_id│  │
-│  │  - sender        │   │
-│  │  - content       │   │
-│  │  - created_at    │   │
-│  └──────────────────┘   │
-└─────────────────────────┘
-```
+Session management uses a simple but effective approach—the server generates a UUID for each conversation and returns it to the client, which stores it in localStorage. On subsequent requests, the client sends this ID to maintain continuity. This avoids the complexity of authentication while still providing conversation persistence across page reloads.
 
-## API Endpoints
+The database schema is minimal: a `conversations` table and a `messages` table with a foreign key relationship. Messages store the sender type (`user` or `ai`) and content, enabling the server to reconstruct conversation history for LLM context. UUIDs are used as primary keys for portability and to avoid sequential ID enumeration.
 
-### POST /chat/message
-Send a message and receive an AI response.
+## LLM Integration
 
-**Request:**
+The LLM service wraps Groq's API, which provides fast inference on Llama 3.3 70B. Groq was chosen over OpenAI or Anthropic primarily for its generous free tier and low latency—their custom LPU hardware delivers responses noticeably faster than GPU-based alternatives.
+
+The system prompt establishes the AI as a customer support agent for "Cozy Cart," a fictional e-commerce store. It includes structured knowledge about shipping policies, return procedures, payment methods, and current promotions. This grounding prevents hallucination on factual queries while allowing natural conversation flow.
+
+Context management balances quality with cost: the last 20 messages are included in each request, and individual messages are truncated to 2000 characters. This keeps token usage reasonable while maintaining enough context for coherent multi-turn conversations.
+
+## API
+
+**POST /chat/message**
 ```json
-{
-  "message": "What's your return policy?",
-  "sessionId": "optional-uuid"
-}
+// Request
+{ "message": "What's your return policy?", "sessionId": "optional-uuid" }
+
+// Response
+{ "reply": "We offer a 30-day hassle-free return policy...", "sessionId": "uuid" }
 ```
 
-**Response:**
-```json
-{
-  "reply": "We have a 30-day hassle-free return policy...",
-  "sessionId": "uuid-of-conversation"
-}
-```
+**GET /chat/history/:sessionId** — Returns all messages for a conversation.
 
-### GET /chat/history/:sessionId
-Fetch conversation history.
+**GET /health** — Health check endpoint.
 
-**Response:**
-```json
-{
-  "sessionId": "uuid",
-  "messages": [
-    {
-      "id": "message-uuid",
-      "sender": "user",
-      "content": "Hello",
-      "timestamp": "2024-01-01T00:00:00.000Z"
-    }
-  ]
-}
-```
+## Running Locally
 
-### GET /health
-Health check endpoint.
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- PostgreSQL 14+ (install via Homebrew: `brew install postgresql@15`)
-
-### 1. Clone and Install
+**Prerequisites:** Node.js 18+, PostgreSQL 14+
 
 ```bash
-git clone <your-repo-url>
-cd ai-chat-app
+# Install dependencies
 npm install
-```
 
-### 2. Set Up PostgreSQL
-
-```bash
-# Start PostgreSQL (if using Homebrew)
+# Start PostgreSQL and create database
 brew services start postgresql@15
-
-# Create the database
 psql postgres -c "CREATE DATABASE chat_app;"
-```
 
-### 3. Configure Environment Variables
-
-```bash
-# Copy the example env file
+# Configure environment
 cp .env.example .env
+# Edit .env: add GROQ_API_KEY from console.groq.com
 
-# Edit .env with your values:
-# - GROQ_API_KEY: Get from https://console.groq.com/keys
-# - DATABASE_URL: Your PostgreSQL connection string
-```
-
-### 4. Set Up Database Tables
-
-```bash
+# Create tables
 npm run db:setup
-```
 
-### 5. Run the Application
-
-```bash
+# Start development servers
 npm run dev
 ```
 
-This starts both:
-- Frontend: http://localhost:8080
-- Backend: http://localhost:3001
-
-## LLM Integration Notes
-
-### Provider
-Using **Groq** with **Llama 3.3 70B** via the `groq-sdk`.
-
-### Why Groq?
-- Generous free tier (no quota issues)
-- Extremely fast inference (custom LPU hardware)
-- Llama 3.3 70B provides excellent quality for support use cases
-
-### Prompting Strategy
-
-The AI is configured as a customer support agent for "Cozy Cart" (fictional e-commerce store). The system prompt includes:
-
-1. **Store Information:** Name, hours, contact details
-2. **Shipping Policy:** Rates, delivery times, international shipping
-3. **Return Policy:** 30-day returns, conditions, refund timeline
-4. **Product Categories:** Home decor, kitchen, bedding, outdoor
-5. **Promotions:** Current discount codes
-6. **Payment Methods:** Cards, PayPal, buy-now-pay-later
-
-### Context Management
-- Last 20 messages are included for conversation context
-- Messages truncated to 2000 characters for cost control
-- System prompt contains all store knowledge (FAQ, policies)
-
-### Error Handling
-- API key validation
-- Timeout handling
-- Rate limit handling (returns friendly error message)
-- Invalid response handling
-
-## Robustness & Input Validation
-
-- Empty messages are rejected (400 error)
-- Long messages are truncated to 2000 characters
-- Invalid sessionIds create new conversations
-- All errors return user-friendly messages
-- Backend never crashes on bad input
-- No secrets in repository (uses .env)
+Frontend runs at `localhost:8080`, backend at `localhost:3001`.
 
 ## Deployment
 
-### Quick Deploy (Recommended)
+The app deploys cleanly to any Node.js hosting platform. Recommended setup:
 
-1. **Database:** Get free PostgreSQL from [Neon](https://neon.tech)
-2. **Backend:** Deploy to [Render](https://render.com)
-   - Build: `npm install`
-   - Start: `npx tsx server/index.ts`
-   - Env vars: `GROQ_API_KEY`, `DATABASE_URL`
-3. **Frontend:** Deploy to [Vercel](https://vercel.com)
-   - Env var: `VITE_API_URL=https://your-backend.onrender.com`
+1. **Database:** Neon (free PostgreSQL)
+2. **Backend:** Render — build with `npm install`, start with `npx tsx server/index.ts`
+3. **Frontend:** Vercel — set `VITE_API_URL` to your backend URL
 
-### Environment Variables for Production
+## Design Decisions
 
-| Variable | Where | Value |
-|----------|-------|-------|
-| `GROQ_API_KEY` | Backend | From console.groq.com |
-| `DATABASE_URL` | Backend | From Neon/Supabase |
-| `VITE_API_URL` | Frontend | Your backend URL |
+**PostgreSQL over SQLite:** While SQLite would simplify local development, PostgreSQL's UUID support and production-readiness made it the better choice. The schema can scale to millions of messages without modification.
 
-## Trade-offs & Decisions
+**Stateless sessions without auth:** For a support chat, full authentication adds friction without clear benefit. The UUID-based session approach provides conversation continuity while keeping the implementation simple. Adding auth later would be straightforward—the session ID could become a user ID foreign key.
 
-1. **PostgreSQL over SQLite:** Chose PostgreSQL for production-readiness and UUID support
-2. **Session in localStorage:** Simple solution without auth; sessionId stored client-side
-3. **Groq over OpenAI:** Free tier, faster inference, no quota issues
-4. **No Redis:** Not needed for this scale; could add for rate limiting later
+**Groq over OpenAI:** Cost and speed. Groq's free tier is generous enough for development and demos, and their inference speed creates a noticeably better user experience. The trade-off is a smaller model ecosystem, but Llama 3.3 70B handles support queries well.
 
-## If I Had More Time...
-
-- [ ] Add WebSocket support for real-time typing indicators
-- [ ] Implement rate limiting with Redis
-- [ ] Add user authentication
-- [ ] Create admin dashboard for viewing all conversations
-- [ ] Add message search functionality
-- [ ] Implement conversation tagging/categorization
-- [ ] Add analytics for common questions
-- [ ] Support file/image attachments
-- [ ] Add unit and integration tests
-- [ ] Implement streaming responses for faster perceived latency
+**No WebSockets:** HTTP polling would add complexity without meaningful UX improvement for a support chat. The typing indicator is client-side only. WebSockets would make sense if we needed real-time features like agent handoff or live typing visibility.
 
 ## Project Structure
 
 ```
-ai-chat-app/
-├── server/                    # Backend (TypeScript)
-│   ├── index.ts              # Express server entry
-│   ├── routes/
-│   │   └── chat.ts           # Chat API routes
-│   ├── services/
-│   │   ├── chat.ts           # Database operations
-│   │   └── llm.ts            # Gemini integration
-│   └── db/
-│       ├── index.ts          # PostgreSQL connection
-│       └── setup.ts          # Schema setup script
-├── src/                       # Frontend (React)
-│   ├── components/
-│   │   ├── chat/             # Chat components
-│   │   └── ui/               # shadcn-ui components
-│   ├── pages/
-│   └── main.tsx
-├── .env.example              # Example environment variables
-├── package.json
-└── README.md
+server/
+├── index.ts           # Express setup, middleware
+├── routes/chat.ts     # API endpoints
+├── services/
+│   ├── chat.ts        # Database operations
+│   └── llm.ts         # Groq integration
+└── db/
+    ├── index.ts       # Connection pool
+    └── setup.ts       # Schema migrations
+
+src/
+├── components/chat/   # Chat UI components
+├── pages/             # Page components
+└── index.css          # Global styles
 ```
-
-## Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start both frontend and backend |
-| `npm run dev:client` | Start only frontend |
-| `npm run dev:server` | Start only backend |
-| `npm run db:setup` | Create database tables |
-| `npm run build` | Build frontend for production |
-| `npm run lint` | Run ESLint |
