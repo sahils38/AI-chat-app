@@ -16,6 +16,10 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+app.get("/ping", (_req, res) => {
+  res.send("<html><body><h1>pong</h1></body></html>");
+});
+
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("Unhandled error:", err);
   res.status(500).json({ error: "Internal server error" });
